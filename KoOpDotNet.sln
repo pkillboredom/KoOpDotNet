@@ -5,6 +5,8 @@ VisualStudioVersion = 17.5.002.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KoOpDotNet.POC", "KoOpDotNet.POC\KoOpDotNet.POC.csproj", "{2BDBB560-B883-4A6F-918D-30A5D53190CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KoOpDotNet.MccPoc", "KoOpDotNet.MccPoc\KoOpDotNet.MccPoc.csproj", "{C7ED3D14-743C-42BB-8476-516A58711869}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{2BDBB560-B883-4A6F-918D-30A5D53190CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2BDBB560-B883-4A6F-918D-30A5D53190CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2BDBB560-B883-4A6F-918D-30A5D53190CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C7ED3D14-743C-42BB-8476-516A58711869}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7ED3D14-743C-42BB-8476-516A58711869}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7ED3D14-743C-42BB-8476-516A58711869}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7ED3D14-743C-42BB-8476-516A58711869}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
