@@ -58,4 +58,48 @@ public static class KdotoolInterop
         }
         return kdotool.StandardOutput.ReadToEnd();
     }
+    public static string SetKWinWindowBorder(string clientId, bool borderEnabled, int timeoutMs = 5000)
+    {
+        // use kdotool to set the window border
+        var kdotool = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "kdotool",
+                Arguments = $"windowstate --{(borderEnabled ? "add" : "remove")} no_border {clientId}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            }
+        };
+        kdotool.Start();
+        kdotool.WaitForExit(timeoutMs);
+        var error = kdotool.StandardError.ReadToEnd();
+        if (!string.IsNullOrEmpty(error))
+        {
+            throw new Exception($"Error while setting window border: {error}");
+        }
+        return kdotool.StandardOutput.ReadToEnd();
+    }
+    public static string ResizeKWinWindow(string clientId, uint width, uint height, int timeoutMs = 5000)
+    {
+        // use kdotool to resize the window
+        var kdotool = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "kdotool",
+                Arguments = $"windowsize {clientId} {width} {height}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            }
+        };
+        kdotool.Start();
+        kdotool.WaitForExit(timeoutMs);
+        var error = kdotool.StandardError.ReadToEnd();
+        if (!string.IsNullOrEmpty(error))
+        {
+            throw new Exception($"Error while resizing window: {error}");
+        }
+        return kdotool.StandardOutput.ReadToEnd();
+    }
 }

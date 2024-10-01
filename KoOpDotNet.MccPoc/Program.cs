@@ -6,6 +6,7 @@
   https://hub.splitscreen.me/handler/xjBSwFNj3ndRntsZh
 ---------------------------------------------------------------------*/
 
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 
 class Program
@@ -16,6 +17,7 @@ class Program
             .AddCommandLine(args)
             .Build();
 
+        // Begin Info from NucleusCoop/Splitscreen.me handler.
         string[] killMutexList = ["Chelankenstein"];
         string[] dirSymlinkExclusions = [
             "data\\ui",
@@ -34,6 +36,7 @@ class Program
             "FMS_logo_microsoft_7_1_.bk2"
         ];
         string[] fileCopyList = [
+            "MCC-Win64-Shipping.exe",
             "gametiplist.xml",
             "playercustomization.xml",
             "scoredb.xml",
@@ -66,94 +69,132 @@ class Program
         var UseGoldberg = true; //Use the built-in Goldberg features in Nucleus | default: false.
         var GoldbergExperimental = true; //Use the experimental branch of Goldberg | Requires `Game.UseGoldberg = true` | default: false.
         var GoldbergNoLocalSave = true; //Do not create a local_save.txt file for Goldberg, saves are to use default game save location.
-        //var LaunchAsDifferentUsers = false; //Launch each instance from a different user account | must run Nucleus as admin | will temporary create user accounts "nucleusplayerx" and delete them when closing Nucleus.
-        var TransferNucleusUserAccountProfiles = true; // Will backup and restore Nucleus user account user profile's on windows between sessions (when user accounts are not kept).
-                                                       // TODO: Is this necessary? Not clear why they've set this when LaunchAsDifferentUsers is false.
-        // var UseCurrentUserEnvironment = false; //Force the game to use the current user's environment (useful for some games that may require different Window user accounts).
-        var HandlerInterval = 100; // This seems to be a tickrate for launching apps and moving windows. Don't know if we care about this.
-        //var SymlinkExe = false;
         var SymlinkGame = true;
         var SymlinkFolders = true;
-        //var HardlinkGame = false;
         var ExecutableName = "MCC-Win64-Shipping.exe";
         var SteamID = "976730";
-        //var GUID = "Halo MCC"; // that's not a guid pal.
         var GameName = "Halo: The Master Chief Collection";
         var BinariesFolder = "mcc\\binaries\\win64";
-        //var MaxPlayers = 16; // maybe someday
         var MaxPlayers = 6;
-        //var MaxPlayersOneMonitor = 16; // maybe someday
-        var MaxPlayersOneMonitor = 6;
         var LauncherTitle = ""; //The name of the launcher's window title. Some games need to go through a launcher to open. This is needed or else the application will lose the game's window.
-        //var Hook.ForceFocus = false; // Used by nucleus to hook the game with x360ce to fake window events, as some games need focus to allow input.
-        //var Hook.ForceFocusWindowName = "Halo: The Master Chief Collection"; // Needed for the above.
         var ResetWindows = true; //After each new instance opens, resize, reposition and remove borders of the previous instance.
-        var RefreshWindowAfterStart = true; //Should each game window be minimized and restored once all instances are opened?.
-                                            // TODO: Is this necessary?
-        //var Hook.DInputEnabled = false; //If the game supports direct input joystick
-        //var UseDInputBlocker = false;
-        //var Hook.XInputEnabled = false; //If the game supports xinput joysticks 
-        //var Hook.XInputReroute = false; //If xinput is enabled, if rerouting should be enabled (basically is we'll reroute directinput back to xinput, so we can track more than 4 gamepads on xinput at once). 
-        //var Hook.CustomDllEnabled = false; //If the game should be run using Nucleus custom version of x360ce for gamepad control and ForceFocus. Enabled by default as the majority of our games need it. Set it to false if you are using xinput plus dlls for x64 games. 
         var UseForceBindIP = true; //Set up game instances with ForceBindIP; each instance having their own IP. 
         var ForceBindIPNoDummy = true; //ForceBindIP will be used without the "dummy" launch argument, the argument prevents crashes but it causes issues in other games.
         var UserProfileSavePath = "AppData\\Roaming\\Goldberg SteamEmu Saves\\976730\\remote";
         var UserProfileConfigPath = "AppData\\LocalLow\\MCC";
-        var UserProfileSavePathNoCopy = true;
-        var UserProfileConfigPathNoCopy = true;
+        var UserProfileSavePathNoCopy = true; //Do not copy files from original UserProfileSavePath if using Nucleus Environment.
+        var UserProfileConfigPathNoCopy = true; //Do not copy files from original UserProfileConfigPath if using Nucleus Environment.
         var Description = ""; // Description of the game, used for the NucleusCoop UI.
-        var KeepSymLinkOnExit = false;
-        var PauseBetweenStarts = 30;
-        var ProtoInput.InjectStartup = false;
-        var ProtoInput.InjectRuntime_RemoteLoadMethod = false;
-        var ProtoInput.InjectRuntime_EasyHookMethod = true;
-        var ProtoInput.InjectRuntime_EasyHookStealthMethod = false;
+        var KeepSymLinkOnExit = false; // Enable or disable symlink files from being deleted when Nucleus is closed | default: false.
+                                       // Also deletes the symlink files when the game is picked (i.e. on startup), in case we crashed last time.
+                                       // End Info from NucleusCoop/Splitscreen.me handler.
+        var GameDirPath = "/home/luke/.local/share/Steam/steamapps/common/Halo The Master Chief Collection";
+        var GameExePath = "/home/luke/.local/share/Steam/steamapps/common/Halo The Master Chief Collection/MCC/Binaries/Win64/MCC-Win64-Shipping.exe";
 
+        // Get the player count from the command line.
+        int playerCount = Convert.ToInt32(config["PlayerCount"]);
+        if (playerCount < 2 || playerCount > MaxPlayers)
+        {
+            throw new Exception($"Player count must be between 2 and {MaxPlayers}");
+        }
+        // Get the resolution of the primary display.
+        (int displayWidth, int displayHeight) = XrandrInterop.GetPrimaryMonitorResolution();
+        // Decide the resolution of each player's window. Waste space rather than giving one player more space, if the number of players is odd.
+        int playerLayoutCount = playerCount % 2 == 0 ? playerCount : playerCount + 1;
 
-        var LockInputAtStart = false;
-        var LockInputSuspendsExplorer = true;
-        var ProtoInput.FreezeExternalInputWhenInputNotLocked = false;
-        var LockInputToggleKey = 0x23;
+        // This forumla is not very smart and will not scale to more than 6 players, or allow vertical splits. Too bad.
+        int playerWindowWidth = displayWidth / (playerLayoutCount / 2);
+        int playerWindowHeight = displayHeight / 2;
+        // Create a list of player window positions.
+        List<(int x, int y)> playerWindowPositions = new List<(int, int)>();
+        for (int i = 0; i < playerCount; i++)
+        {
+            int x = i % (playerLayoutCount / 2) * playerWindowWidth;
+            int y = i / (playerLayoutCount / 2) * playerWindowHeight;
+            playerWindowPositions.Add((x, y));
+        }
 
+        // Create a temporary directory for the game and user profiles. This must be deleted when the program exits.
+        string tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        string[] instanceDirs = new string[playerCount];
+        try
+        {
+            ProcessStartInfo[] playerStartInfos = new ProcessStartInfo[playerCount];
+            // For each player, create a subdirectory for the game and user profiles.
+            for (int i = 0; i < playerCount; i++)
+            {
+                string instanceDir = Path.Combine(tempDir, $"Player{i}");
+                Directory.CreateDirectory(instanceDir);
+                instanceDirs[i] = instanceDir;
+                string instanceGameDirPath = Path.Combine(instanceDir, "game");
+                Directory.CreateDirectory(instanceGameDirPath);
+                string instanceUserDirPath = Path.Combine(instanceDir, "user");
+                Directory.CreateDirectory(instanceUserDirPath);
+                // Symbolic Link all of the files and folders in the original game directory, EXCEPT those listed in fileSymlinkExclusions, dirSymlinkExclusions, and fileCopyList.
+                // Copy the files in fileCopyList.
+                string[] gameDirContents = Directory.GetFiles(GameDirPath, "*", SearchOption.AllDirectories);
+                foreach (string file in gameDirContents)
+                {
+                    string relativePath = Path.GetRelativePath(GameDirPath, file);
+                    bool fileIsInSymlinkDirExclusions = dirSymlinkExclusions.Any(exclusion => relativePath.StartsWith(exclusion));
+                    bool fileIsInSymlinkFileExclusions = fileSymlinkExclusions.Contains(Path.GetFileName(file));
+                    bool fileIsInCopyList = fileCopyList.Contains(Path.GetFileName(file));
+                    if (!(fileIsInSymlinkDirExclusions ||
+                        fileIsInSymlinkFileExclusions ||
+                        fileIsInCopyList))
+                    {
+                        string symlinkPath = Path.Combine(instanceGameDirPath, relativePath);
+                        string symlinkDir = Path.GetDirectoryName(symlinkPath)!;
+                        if (!Directory.Exists(symlinkDir))
+                        {
+                            Directory.CreateDirectory(symlinkDir);
+                        }
+                        File.CreateSymbolicLink(symlinkPath, file);
+                    }
+                    else if (fileIsInCopyList)
+                    {
+                        string copyPath = Path.Combine(instanceGameDirPath, relativePath);
+                        File.Copy(file, copyPath);
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+                
 
-        var ProtoInput.RenameHandlesHook = false;
-        string[] ProtoInputRenameHandles = [];
-        string[] ProtoInputRenameNamedPipes = [];
+                
+                
+                // Create Process Start Infos for each player.
+                ProcessStartInfo startInfo = new ProcessStartInfo()
+                {
+                    FileName = "gamescope",
+                    Arguments = $"-W {playerWindowWidth} -H {playerWindowHeight} -- /home/luke/.local/share/Steam/ubuntu12_32/reaper SteamLaunch AppId=976730 -- /home/luke/.local/share/Steam/ubuntu12_32/steam-launch-wrapper -- /home/luke/.local/share/Steam/steamapps/common/SteamLinuxRuntime_sniper/_v2-entry-point --verb=waitforexitandrun -- /home/luke/.local/share/Steam/steamapps/common/Proton - Experimental/proton waitforexitandrun {launchExePath} -no-eac",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                playerStartInfos[i] = startInfo;
+            }
 
-        var ProtoInput.RegisterRawInputHook = true;
-        var ProtoInput.GetRawInputDataHook = false;
-        var ProtoInput.MessageFilterHook = true;
-        var ProtoInput.GetCursorPosHook = false;
-        var ProtoInput.SetCursorPosHook = false;
-        var ProtoInput.GetKeyStateHook = false;
-        var ProtoInput.GetAsyncKeyStateHook = false;
-        var ProtoInput.GetKeyboardStateHook = false;
-        var ProtoInput.CursorVisibilityHook = false;
-        var ProtoInput.ClipCursorHook = true;
-        var ProtoInput.FocusHooks = false;
-        var ProtoInput.DrawFakeCursor = false;
-        var ProtoInput.FindWindowHook = false;
-
-
-        var ProtoInput.RawInputFilter = false;
-        var ProtoInput.MouseMoveFilter = false;
-        var ProtoInput.MouseActivateFilter = false;
-        var ProtoInput.WindowActivateFilter = false;
-        var ProtoInput.WindowActvateAppFilter = false;
-        var ProtoInput.MouseWheelFilter = false;
-        var ProtoInput.MouseButtonFilter = false;
-        var ProtoInput.KeyboardButtonFilter = false;
-
-
-        var ProtoInput.SendMouseWheelMessages = true;
-        var ProtoInput.SendMouseButtonMessages = true;
-        var ProtoInput.SendMouseMovementMessages = true;
-        var ProtoInput.SendKeyboardButtonMessages = true;
-        var ProtoInput.XinputHook = true;
-        var ProtoInput.UseOpenXinput = true;
-        var ProtoInput.UseDinputRedirection = false;
-        var ProtoInput.DinputDeviceHook = false;
-        var ProtoInput.DinputHookAlsoHooksGetDeviceState = false;
-
+            Process[] playerProcesses = new Process[playerCount];
+            // One at a time, start the processes, remove the borders, resize them, and move them to the correct position.
+            // We have to resize them after removing the borders, because removing the borders expands the inner surface to the old whole window size.
+            for (int i = 0; i < playerCount; i++)
+            {
+                playerProcesses[i] = Process.Start(playerStartInfos[i]);
+                playerProcesses[i].WaitForInputIdle();
+                string clientId = KdotoolInterop.GetKWinClientId(playerProcesses[i], GameName);
+                KdotoolInterop.SetKWinWindowBorder(clientId, false);
+                KdotoolInterop.ResizeKWinWindow(clientId, (uint)playerWindowWidth, (uint)playerWindowHeight);
+                KdotoolInterop.MoveKWinWindow(clientId, (uint)playerWindowPositions[i].x, (uint)playerWindowPositions[i].y);
+            }
+        }
+        finally
+        {
+            // Clean up the temporary directory.
+            Directory.Delete(tempDir, true);
+        }
     }
 }
